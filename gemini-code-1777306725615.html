@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Discord Space Player v3.2</title>
+    <style>
+        /* БАЗОВЫЕ НАСТРОЙКИ (ЧТОБЫ НЕ БЫЛО БЕЛОГО ЭКРАНА) */
+        html, body {
+            background-color: #000; /* Если картинка не загрузится, будет черный экран */
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        /* ФОН (ЗЕМЛЯ) */
+        .background-image {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            /* ССЫЛКА НА ВАШУ КАРТИНКУ НИЖЕ */
+            background: url('https://images.wallpaperscraft.ru/image/single/zemlia_planeta_chernyj_187300_3840x2160.jpg') no-repeat center center;
+            background-size: cover;
+            z-index: 1; /* Самый дальний слой */
+        }
+
+        /* КАРТОЧКА ПЛЕЕРА */
+        .player-card {
+            position: relative;
+            z-index: 10; /* Слой над фоном */
+            width: 380px;
+            background: rgba(30, 31, 34, 0.85); /* Тёмный цвет Discord с чуть большей непрозрачностью для читаемости */
+            backdrop-filter: blur(10px); /* Немного уменьшил размытие, чтобы фон был виднее */
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            color: #f2f3f5;
+        }
+
+        h2 { margin-top: 0; font-size: 20px; text-align: center; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+
+        input[type="text"] {
+            width: 100%;
+            background: #1e1f22;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            color: #fff;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        /* ПЛЕЙЛИСТ */
+        .track-list {
+            background: rgba(0, 0, 0, 0.3);
+            height: 150px;
+            overflow-y: auto;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        /* Стилизация скроллбара под Discord */
+        .track-list::-webkit-scrollbar { width: 8px; }
+        .track-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 8px; }
+        .track-list::-webkit-scrollbar-thumb { background: #1e1f22; border-radius: 8px; }
+
+        .track-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 14px;
+            transition: 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .track-item:hover { background: rgba(255, 255, 255, 0.05); }
+        .track-item.active { background: #5865f2; color: #fff; }
+
+        /* КНОПКИ */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            background: #4e5058;
+            border: none;
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .btn:hover {
+            background: #6d6f78;
+            transform: translateY(-2px);
+        }
+
+        .btn:active { transform: translateY(0); }
+
+        .btn-blue { background: #5865f2; }
+        .btn-blue:hover { background: #4752c4; box-shadow: 0 4px 10px rgba(88, 101, 242, 0.3); }
+
+        audio { width: 100%; filter: invert(0.9); margin-bottom: 15px; height: 35px; }
+        #playing-now { font-size: 12px; text-align: center; color: #b5bac1; margin-bottom: 10px; height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+    </style>
+</head>
+<body>
+
+    <div class="background-image"></div>
+
+    <div class="player-card">
+        <h2>Earth Player</h2>
+        
+        <input type="text" id="searchInput" placeholder="Поиск музыки...">
+        
+        <div class="track-list" id="playlist">
+            <div style="text-align:center; padding-top:60px; opacity:0.4; font-size: 14px;">Добавь треки с ПК</div>
+        </div>
+
+        <div id="playing-now"></div>
+        <audio id="mainAudio" controls></audio>
+
+        <div class="controls-grid">
+            <button class="btn btn-blue" onclick="document.getElementById('upload').click()">
+                <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg> Файлы
+            </button>
+            <button class="btn" id="loopBtn" onclick="toggleLoop()">
+                <svg viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Повтор
+            </button>
+            <button class="btn" onclick="clearList()">
+                <svg viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg> Сброс
+            </button>
+            <button class="btn" onclick="download()">
+                <svg viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> Скачать
+            </button>
+        </div>
+
+        <input type="file" id="upload" multiple accept="audio/*" style="display:none">
+    </div>
+
+    <script>
+        const audio = document.getElementById('mainAudio');
+        const playlist = document.getElementById('playlist');
+        const upload = document.getElementById('upload');
+        const search = document.getElementById('searchInput');
+        const playingNow = document.getElementById('playing-now');
+
+        let songs = [];
+        let currentIndex = -1;
+
+        upload.onchange = (e) => {
+            const newFiles = Array.from(e.target.files);
+            if (newFiles.length > 0) {
+                songs = [...songs, ...newFiles];
+                renderList();
+            }
+        };
+
+        function renderList() {
+            playlist.innerHTML = '';
+            const query = search.value.toLowerCase();
+            let hasTracks = false;
+            
+            songs.forEach((file, index) => {
+                if (file.name.toLowerCase().includes(query)) {
+                    hasTracks = true;
+                    const item = document.createElement('div');
+                    item.className = 'track-item' + (index === currentIndex ? ' active' : '');
+                    // Добавил иконку ноты перед названием
+                    item.innerHTML = `🎵 ${file.name}`;
+                    item.title = file.name; // Подсказка при наведении
+                    item.onclick = () => playTrack(index);
+                    playlist.appendChild(item);
+                }
+            });
+
+            if (!hasTracks) {
+                if (songs.length === 0) {
+                    playlist.innerHTML = '<div style="text-align:center; padding-top:60px; opacity:0.4; font-size: 14px;">Добавь треки с ПК</div>';
+                } else {
+                    playlist.innerHTML = '<div style="text-align:center; padding-top:60px; opacity:0.4; font-size: 14px;">Ничего не найдено</div>';
+                }
+            }
+        }
+
+        function playTrack(index) {
+            if (index === currentIndex && !audio.paused) return; // Не перезапускать, если уже играет
+
+            currentIndex = index;
+            const file = songs[index];
+            
+            // Освобождаем старую ссылку, если она была, чтобы не забивать память
+            if (audio.src) {
+                URL.revokeObjectURL(audio.src);
+            }
+
+            audio.src = URL.createObjectURL(file);
+            audio.play().catch(e => console.error("Ошибка воспроизведения:", e));
+            playingNow.innerText = "Играет: " + file.name;
+            playingNow.title = file.name;
+            renderList();
+        }
+
+        search.oninput = renderList;
+
+        function toggleLoop() {
+            audio.loop = !audio.loop;
+            // Изменяем цвет кнопки при включенном повторе (зеленый Discord)
+            document.getElementById('loopBtn').style.background = audio.loop ? '#248046' : '#4e5058';
+        }
+
+        function clearList() {
+            // Освобождаем ссылку
+            if (audio.src) {
+                URL.revokeObjectURL(audio.src);
+            }
+            songs = [];
+            currentIndex = -1;
+            audio.src = '';
+            playingNow.innerText = '';
+            upload.value = ''; // Сброс инпута файла
+            renderList();
+        }
+
+        function download() {
+            if (currentIndex === -1) return;
+            const a = document.createElement('a');
+            a.href = audio.src;
+            a.download = songs[currentIndex].name;
+            a.click();
+        }
+
+        // Автоматическое переключение на следующий трек
+        audio.onended = () => {
+            if (!audio.loop && currentIndex < songs.length - 1) {
+                playTrack(currentIndex + 1);
+            }
+        };
+    </script>
+</body>
+</html>
