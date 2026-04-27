@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Minimal Glass Player</title>
+    <style>
+        :root {
+            --accent: #00d2ff;
+            --glass: rgba(255, 255, 255, 0.08);
+            --border: rgba(255, 255, 255, 0.15);
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: white;
+            overflow: hidden;
+        }
+
+        .player-card {
+            width: 400px;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+        }
+
+        /* Поиск */
+        .search-box {
+            width: 100%;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 12px;
+            color: white;
+            margin-bottom: 20px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        /* Список треков - теперь он заметный */
+        .playlist-container {
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            height: 200px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .track-item {
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        .track-item:hover { background: rgba(255,255,255,0.05); }
+        .track-item.active { background: rgba(0,210,255,0.1); color: var(--accent); }
+
+        .track-item svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+        /* Заглушка, если пусто */
+        .empty-state {
+            text-align: center;
+            padding-top: 60px;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        /* Управление */
+        #now-playing {
+            text-align: center;
+            font-size: 13px;
+            color: var(--accent);
+            margin-bottom: 10px;
+            height: 18px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        audio { width: 100%; filter: invert(1); margin-bottom: 20px; height: 30px; }
+
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        .btn {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 13px;
+            transition: 0.2s;
+        }
+
+        .btn:hover { background: rgba(255,255,255,0.15); }
+        .btn-main { background: var(--accent); color: #121212; border: none; font-weight: bold; }
+        .btn.active { border-color: #ff4d4d; color: #ff4d4d; }
+
+        /* Настройки */
+        .settings {
+            margin-top: 20px;
+            font-size: 11px;
+            opacity: 0.5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        input[type="range"] { accent-color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<div class="player-card">
+    <input type="text" id="search" class="search-box" placeholder="Поиск в плейлисте...">
+
+    <div class="playlist-container" id="playlist">
+        <div class="empty-state" id="empty">
+            <svg viewBox="0 0 24 24" style="width:40px; height:40px; stroke:white; fill:none; margin-bottom:10px;">
+                <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+            </svg><br>
+            Список пуст
+        </div>
+    </div>
+
+    <div id="now-playing"></div>
+    <audio id="audio" controls></audio>
+
+    <div class="btn-grid">
+        <button class="btn btn-main" onclick="document.getElementById('input').click()">
+            <svg viewBox="0 0 24 24" style="stroke:black; fill:none; width:16px;"><path d="M12 4v16m8-8H4"/></svg>
+            Выбрать музыку
+        </button>
+        <button class="btn" id="loop-btn" onclick="toggleLoop()">
+            <svg viewBox="0 0 24 24" style="stroke:white; fill:none; width:16px;"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Повтор
+        </button>
+        <button class="btn" onclick="download()">
+            <svg viewBox="0 0 24 24" style="stroke:white; fill:none; width:16px;"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Скачать
+        </button>
+        <button class="btn" onclick="clearAll()">
+            <svg viewBox="0 0 24 24" style="stroke:white; fill:none; width:16px;"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Очистить
+        </button>
+    </div>
+
+    <div class="settings">
+        ЭФФЕКТ СТЕКЛА
+        <input type="range" id="glass-op" min="0" max="40" value="8">
+    </div>
+
+    <input type="file" id="input" multiple accept="audio/*" style="
